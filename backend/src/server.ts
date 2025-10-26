@@ -42,4 +42,4 @@ app.get('/', (req, res) => {
 console.log('✅ Routes registered.');
 
 console.log(`👂 Attempting to start server on port ${PORT}...`);
-app.listen(PORT, () => console.log(`🎉 Backend server is running on http://localhost:${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Backend server is live and running on http://localhost:${PORT}`));
