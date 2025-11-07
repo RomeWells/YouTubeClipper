@@ -1,6 +1,18 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getVideoTranscript, getVideoComments } from './youtube.service';
 
+interface Clip {
+  timestamp: string;
+  startTime: string;
+  endTime: string;
+  viralScore: number;
+  hook: string;
+  reason: string;
+  category: string;
+  suggestedTitle: string;
+  suggestedDescription: string;
+}
+
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 if (!GEMINI_API_KEY) {
   throw new Error('GEMINI_API_KEY is not set in the environment variables.');
@@ -24,13 +36,15 @@ const ANALYSIS_PROMPT = `
   ---
 
   Based on the content, identify the top 5 most viral-worthy moments. For each moment, provide:
-  1.  "timestamp": The start time of the moment in "M:SS" format.
-  2.  "viralScore": A score from 0-100 indicating its viral potential.
-  3.  "hook": The single, most impactful sentence or phrase from that moment.
-  4.  "reason": A brief, compelling explanation of WHY this moment is likely to go viral (e.g., "addresses a controversial topic," "shows a surprising transformation," "has a strong emotional peak").
-  5.  "category": One of the following: "Emotional Peak", "Plot Twist", "Hot Take", "Value Bomb", "Transformation", "Humor".
-  6.  "suggestedTitle": A catchy, SEO-friendly YouTube Shorts title (max 60 chars) with relevant emojis.
-  7.  "suggestedDescription": A brief, engaging description with 2-3 relevant hashtags.
+  1.  "timestamp": The start time of the moment in "M:SS" format. (This will be used for display, but use startTime and endTime for extraction)
+  2.  "startTime": The exact start time of the clip in "MM:SS" or "HH:MM:SS" format.
+  3.  "endTime": The exact end time of the clip in "MM:SS" or "HH:MM:SS" format.
+  4.  "viralScore": A score from 0-100 indicating its viral potential.
+  5.  "hook": The single, most impactful sentence or phrase from that moment.
+  6.  "reason": A brief, compelling explanation of WHY this moment is likely to go viral (e.g., "addresses a controversial topic," "shows a surprising transformation," "has a strong emotional peak").
+  7.  "category": One of the following: "Emotional Peak", "Plot Twist", "Hot Take", "Value Bomb", "Transformation", "Humor".
+  8.  "suggestedTitle": A catchy, SEO-friendly YouTube Shorts title (max 60 chars) with relevant emojis.
+  9.  "suggestedDescription": A brief, engaging description with 2-3 relevant hashtags.
 
   Scoring Criteria (Weight):
   - Emotional Impact (25%): Does it evoke strong emotions like surprise, shock, joy, or inspiration?
@@ -55,7 +69,9 @@ export const findViralMoments = async (videoId: string) => {
     ]);
 
     if (!transcriptData || transcriptData.length === 0) {
-      throw new Error('Transcript is not available for this video.');
+      const noTranscriptError = new Error('Transcript is not available for this video. This often happens with live streams or very new videos.');
+      noTranscriptError.name = 'NoTranscriptError';
+      throw noTranscriptError;
     }
 
     const transcript = transcriptData.map(t => t.text).join(' ');

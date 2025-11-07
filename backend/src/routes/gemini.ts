@@ -1,11 +1,13 @@
 import express from 'express';
 import { findViralMoments } from '../services/gemini.service';
 import { getVideoDetails } from '../services/youtube.service';
+import { extractVideoId } from '../utils/youtube.js';
 
 const router = express.Router();
 
 // POST /api/gemini/analyze
 router.post('/analyze', async (req, res) => {
+  console.log('Received /analyze request. Body:', req.body);
   const { videoUrl } = req.body;
 
   if (!videoUrl) {
@@ -13,14 +15,19 @@ router.post('/analyze', async (req, res) => {
   }
 
   try {
-    // Extract video ID from URL
-    const videoIdMatch = videoUrl.match(/(?:v=)([^&]+)/);
-    if (!videoIdMatch || !videoIdMatch[1]) {
-      return res.status(400).json({ error: 'Invalid YouTube URL' });
+    console.log(`Attempting to extract video ID from URL: "${videoUrl}"`);
+    const videoId = extractVideoId(videoUrl);
+    console.log(`Extracted video ID: "${videoId}"`);
+
+    if (!videoId) {
+      return res.status(400).json({
+        error: 'Invalid YouTube URL',
+        details: 'Could not extract a valid video ID from the provided URL. Please check the format.'
+      });
     }
-    const videoId = videoIdMatch[1];
 
     // Fetch viral moments and video details in parallel
+    // Note: We don't download or extract clips here - that happens when user clicks "Extract Viral Clip"
     const [viralMoments, videoDetails] = await Promise.all([
         findViralMoments(videoId),
         getVideoDetails(videoId)

@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import path from 'path'; // Import path module
 import express from 'express';
 import cors from 'cors';
 
@@ -17,6 +18,7 @@ console.log('✅ Dotenv loaded. YOUTUBE_API_KEY present:', !!process.env.YOUTUBE
 // NOW import the routes AFTER dotenv is configured
 const { default: geminiRoutes } = await import('./routes/gemini.js');
 const { default: authRoutes } = await import('./routes/auth.js');
+const { default: youtubeRoutes } = await import('./routes/youtube.js'); // Import new YouTube routes
 console.log('✅ All imports complete');
 
 console.log('📦 Initializing Express app...');
@@ -28,6 +30,11 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json());
+
+// Serve static video files
+const videosPath = path.join(__dirname, '../videos');
+console.log('📂 Serving static files from:', videosPath);
+app.use('/videos', express.static(videosPath));
 console.log('✅ Middleware configured.');
 
 const PORT = process.env.PORT || 3001;
@@ -35,6 +42,7 @@ const PORT = process.env.PORT || 3001;
 console.log('🛣️ Registering routes...');
 app.use('/api/gemini', geminiRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/youtube', youtubeRoutes); // Register new YouTube routes
 
 app.get('/', (req, res) => {
   res.send('YouTube Viral Clipper API is running!');

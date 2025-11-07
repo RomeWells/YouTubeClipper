@@ -111,17 +111,82 @@ Moments are scored 0-100 based on four 25% weighted criteria:
 
 Categories: Emotional Peak, Plot Twist, Hot Take, Value Bomb, Transformation, Humor
 
+## Recent Updates (November 2025)
+
+### ✅ Video Extraction & Upload - NOW WORKING
+
+The complete video extraction and upload workflow is now fully implemented and functional:
+
+1. **Video Download**: `video.service.ts` uses `youtube-dl-exec` to download videos via yt-dlp
+2. **Clip Extraction**: `ffmpeg` (via `fluent-ffmpeg`) extracts specific time segments
+3. **YouTube Upload**: OAuth 2.0 authenticated upload to YouTube via googleapis
+4. **Scheduling**: Videos can be scheduled for future publishing using `node-cron`
+
+### New API Endpoints
+
+**Video Processing:**
+- `POST /api/youtube/extract-clip` - Downloads video and extracts a single clip
+- `POST /api/youtube/process-and-upload` - Complete workflow: download → extract → upload
+
+**YouTube Upload:**
+- `GET /api/youtube/auth` - Initiates OAuth flow
+- `GET /api/youtube/oauth2callback` - Handles OAuth callback
+- `POST /api/youtube/upload` - Uploads video to YouTube
+- `POST /api/youtube/schedule` - Schedules video publishing
+
+### Frontend Updates
+
+**App.tsx:**
+- Added `extractingClip` state to track extraction progress
+- `handleAddClip()` now calls `/api/youtube/extract-clip` endpoint
+- Extracts video ID from URL and passes to backend
+- Shows loading spinner during extraction
+- Clips are added to "My Clips" with `clipPath` populated
+
+**MyClips.tsx:**
+- Already had upload functionality, now fully integrated
+- Video player displays extracted clips
+- "Post Now" button uploads immediately as public
+- "Schedule Post" button uploads as private and schedules publishing
+
+### File Storage
+
+Videos are stored in `/backend/videos/`:
+- `downloaded/` - Full YouTube videos (cached for reuse)
+- `extracted/` - Individual clips ready for upload
+
+Static file serving is configured in server.ts:29 - `/videos` endpoint serves extracted clips.
+
 ## Known Issues & TODOs
 
-1. **Mock Transcript Data**: `youtube.service.ts:getVideoTranscript()` currently returns hardcoded mock data. This needs to be replaced with a real YouTube transcript library (e.g., `youtube-transcript` npm package) or YouTube Caption API integration.
+1. **CORS Configuration**: Verified to be correct (`http://localhost:5173` in server.ts:29)
 
-2. **CORS Port Mismatch**: The backend CORS is currently configured for `http://localhost:5175` (server.ts:11) but frontend runs on `http://localhost:5173` by default. This may cause API call failures.
+2. **OAuth Token Storage**: Tokens are stored in memory via `setAuthenticatedOAuth2Client()`. For production:
+   - Store tokens in database
+   - Implement token refresh
+   - Add session management
 
-3. **OAuth Token Storage**: The auth callback redirects tokens to the frontend URL (auth.ts:48), but there's no frontend implementation to handle this flow or store tokens securely.
+3. **No Database**: All analysis is ephemeral. Consider adding:
+   - Clip history
+   - Performance analytics
+   - User preferences
+   - Upload queue
 
-4. **No Database**: All analysis is ephemeral. There's no persistence layer for saving clips, tracking performance, or storing user preferences.
+4. **Rate Limiting**: No rate limiting implemented for:
+   - Gemini API calls
+   - YouTube API calls
+   - Video downloads (yt-dlp)
+   - Consider implementing with `express-rate-limit`
 
-5. **Rate Limiting**: No rate limiting implemented for Gemini or YouTube API calls. This can lead to quota exhaustion or API errors.
+5. **Error Handling**: Could be improved:
+   - Better error messages for yt-dlp failures
+   - Retry logic for transient failures
+   - Cleanup of partially downloaded files
+
+6. **Disk Space Management**: No automatic cleanup of:
+   - Downloaded videos in `/backend/videos/downloaded/`
+   - Extracted clips in `/backend/videos/extracted/`
+   - Consider implementing TTL or manual cleanup endpoint
 
 ## TypeScript Configuration Notes
 
