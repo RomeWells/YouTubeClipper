@@ -1,8 +1,18 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { getVideoTranscript, getVideoComments } from './youtube.service';
+import { getVideoTranscript, getVideoComments } from './youtube.service.js';
+import { youtube_v3 } from '@googleapis/youtube';
+import { exec } from 'child_process'; // Import exec
+import { promisify } from 'util'; // Import promisify
+import * as path from 'path'; // Import path
+
+const execAsync = promisify(exec); // Promisify exec
+
+interface TranscriptItem {
+  text: string;
+}
 
 interface Clip {
-  timestamp: string;
+  timestamp?: string; // Made optional as gemini_clip_finder.py doesn't return it
   startTime: string;
   endTime: string;
   viralScore: number;
@@ -11,6 +21,8 @@ interface Clip {
   category: string;
   suggestedTitle: string;
   suggestedDescription: string;
+  clipPath?: string; // Added for consistency with MyClips.tsx
+  tags?: string[]; // Added for consistency with MyClips.tsx
 }
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -61,7 +73,7 @@ const ANALYSIS_PROMPT = `
  * @param videoId The ID of the YouTube video.
  * @returns A list of potential viral moments.
  */
-export const findViralMoments = async (videoId: string) => {
+export const findViralMoments = async (videoId: string): Promise<Clip[]> => {
   try {
     const [transcriptData, commentsData] = await Promise.all([
       getVideoTranscript(videoId),
@@ -74,8 +86,8 @@ export const findViralMoments = async (videoId: string) => {
       throw noTranscriptError;
     }
 
-    const transcript = transcriptData.map(t => t.text).join(' ');
-    const comments = commentsData.map(c => c.snippet?.topLevelComment?.snippet?.textDisplay || '').join('\n');
+    const transcript = transcriptData.map((t: TranscriptItem) => t.text).join(' ');
+    const comments = commentsData.map((c: youtube_v3.Schema$CommentThread) => c.snippet?.topLevelComment?.snippet?.textDisplay || '').join('\n');
 
     const prompt = ANALYSIS_PROMPT
       .replace('{transcript}', transcript.slice(0, 100000)) // Use a reasonable portion of the transcript
@@ -93,5 +105,37 @@ export const findViralMoments = async (videoId: string) => {
   } catch (error) {
     console.error('Error finding viral moments:', error);
     throw new Error('Failed to analyze video with Gemini AI.');
+  }
+};
+
+/**
+ * Finds viral moments from a given transcript using the Python script.
+ * @param transcript The transcript of the video.
+ * @returns A list of potential viral moments.
+ */
+export const findViralMomentsFromTranscript = async (transcript: string): Promise<Clip[]> => {
+  try {
+    // Escape double quotes in the transcript for shell command
+    const escapedTranscript = transcript.replace(/"/g, '\\"');
+
+    const command = `../venv/bin/python3 ../gemini_clip_finder.py --transcript "${escapedTranscript}"`;
+    console.log('Executing command:', command);
+
+    const { stdout, stderr } = await execAsync(command, {
+      cwd: path.join(process.cwd(), '../'), // Set CWD to project root
+      env: { ...process.env, GEMINI_API_KEY: process.env.GEMINI_API_KEY } // Pass GEMINI_API_KEY
+    });
+
+    if (stderr) {
+      console.error('gemini_clip_finder.py stderr:', stderr);
+    }
+
+    // Clean the response to ensure it's valid JSON
+    const jsonResponse = JSON.parse(stdout.replace(/```json/g, '').replace(/```/g, '',).trim());
+
+    return jsonResponse.viralMoments;
+  } catch (error) {
+    console.error('Error finding viral moments from transcript:', error);
+    throw new Error('Failed to find viral moments from transcript using Gemini.');
   }
 };
