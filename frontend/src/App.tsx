@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { Youtube, Film, BarChart2, Settings, Bot, ThumbsUp, Sparkles, Clock } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Youtube, Film, BarChart2, Settings, Bot, ThumbsUp, Sparkles, Clock, Mic } from 'lucide-react';
 import MyClips from './components/MyClips';
+import SalesPage from './components/SalesPage';
 import MyClipsTest from './components/MyClipsTest';
+import WhisperTest from './components/WhisperTest'; // Import WhisperTest
 
 interface Clip {
   timestamp: string;
@@ -19,39 +21,7 @@ interface AnalysisResult {
   viralMoments: Clip[];
 }
 
-// Mock data for viral moments - replace with API data
-const mockViralMoments: Clip[] = [
-  {
-    timestamp: "0:15",
-    startTime: "0:10",
-    endTime: "0:20",
-    suggestedTitle: "Cat doing a backflip!",
-    hook: "Watch this cat defy gravity!",
-    reason: "Cats are popular, and backflips are unexpected.",
-    viralScore: 95,
-    category: "Animals",
-  },
-  {
-    timestamp: "1:30",
-    startTime: "1:25",
-    endTime: "1:35",
-    suggestedTitle: "Dog talking like a human!",
-    hook: "You won't believe what this dog says!",
-    reason: "Talking animals are always a hit.",
-    viralScore: 88,
-    category: "Animals",
-  },
-  {
-    timestamp: "2:45",
-    startTime: "2:40",
-    endTime: "2:50",
-    suggestedTitle: "Baby's hilarious reaction to lemon!",
-    hook: "Sour face, sweet laughs!",
-    reason: "Babies' reactions are universally funny.",
-    viralScore: 92,
-    category: "Comedy",
-  },
-];
+
 
 const App = () => {
   const [videoUrl, setVideoUrl] = useState('');
@@ -142,7 +112,7 @@ const App = () => {
     setAnalysisResult(null);
 
     try {
-      const response = await fetch('http://localhost:3001/api/gemini/analyze', {
+      const response = await fetch('http://localhost:3001/api/gemini/transcribe-and-analyze', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -156,7 +126,9 @@ const App = () => {
       }
 
       const data = await response.json();
-      setAnalysisResult(data);
+      setAnalysisResult(data); // data will now contain transcript, source, and viralMoments
+      // Optionally, you might want to display the source (YouTube/Whisper) in the UI
+      // For now, we'll just update analysisResult
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred.');
       console.error(err);
@@ -211,6 +183,28 @@ const App = () => {
                   >
                     <Bot size={20} className="mr-3" />
                     Test Clips
+                  </button>
+                </li>
+                <li className="mt-2">
+                  <button
+                    className={`w-full text-left py-3 px-4 rounded-lg flex items-center transition-all ${
+                      activeTab === 'whisperTest' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:bg-gray-800'
+                    }`}
+                    onClick={() => setActiveTab('whisperTest')}
+                  >
+                    <Mic size={20} className="mr-3" />
+                    Whisper Test
+                  </button>
+                </li>
+                <li className="mt-2">
+                  <button
+                    className={`w-full text-left py-3 px-4 rounded-lg flex items-center transition-all ${
+                      activeTab === 'salesPage' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:bg-gray-800'
+                    }`}
+                    onClick={() => setActiveTab('salesPage')}
+                  >
+                    <ThumbsUp size={20} className="mr-3" />
+                    Sales Page
                   </button>
                 </li>
                 <li className="mt-2">
@@ -324,6 +318,12 @@ const App = () => {
           )}
           {activeTab === 'testClips' && (
             <MyClipsTest />
+          )}
+          {activeTab === 'whisperTest' && (
+            <WhisperTest />
+          )}
+          {activeTab === 'salesPage' && (
+            <SalesPage />
           )}
         </main>
       </div>
