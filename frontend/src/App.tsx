@@ -18,6 +18,8 @@ interface Clip {
 }
 
 interface AnalysisResult {
+  transcript: string;
+  source: 'youtube' | 'whisper';
   viralMoments: Clip[];
 }
 
@@ -109,7 +111,7 @@ const App = () => {
     }
     setLoading(true);
     setError('');
-    setAnalysisResult(null);
+    setAnalysisResult(null); // Clear previous results
 
     try {
       const response = await fetch('http://localhost:3001/api/gemini/transcribe-and-analyze', {
@@ -125,10 +127,8 @@ const App = () => {
         throw new Error(errorData.error || 'Failed to analyze video.');
       }
 
-      const data = await response.json();
-      setAnalysisResult(data); // data will now contain transcript, source, and viralMoments
-      // Optionally, you might want to display the source (YouTube/Whisper) in the UI
-      // For now, we'll just update analysisResult
+      const data: AnalysisResult = await response.json(); // Cast to AnalysisResult
+      setAnalysisResult(data);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred.');
       console.error(err);
@@ -269,46 +269,64 @@ const App = () => {
 
               {analysisResult && (
                 <div className="mt-10">
-                  <h3 className="text-2xl font-bold mb-6">Top 5 Viral Moments</h3>
-                  <div className="space-y-4">
-                    {analysisResult.viralMoments.map((moment: Clip, index: number) => (
-                      <div key={index} className="bg-gray-800 p-5 rounded-xl border border-gray-700">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <div className="flex items-center mb-3">
-                              <div className={`font-bold text-2xl p-3 rounded-lg ${moment.viralScore > 90 ? 'bg-green-500/20 text-green-400' : moment.viralScore > 80 ? 'bg-yellow-500/20 text-yellow-400' : 'bg-blue-500/20 text-blue-400'}`}>
-                                {moment.viralScore}
+                  {/* Display Transcript and Source */}
+                  {analysisResult.transcript && (
+                    <div className="mb-6 p-4 bg-gray-800 rounded-xl border border-gray-700">
+                      <p className="text-gray-300 mb-2"><strong>Transcription Source:</strong> {analysisResult.source}</p>
+                      <h3 className="text-xl font-bold mb-2">Full Transcript:</h3>
+                      <p className="text-gray-400 whitespace-pre-wrap max-h-60 overflow-y-auto">{analysisResult.transcript}</p>
+                    </div>
+                  )}
+
+                  {analysisResult.viralMoments && analysisResult.viralMoments.length > 0 && (
+                    <>
+                      <h3 className="text-2xl font-bold mb-6">Top 5 Viral Moments</h3>
+                      <div className="space-y-4">
+                        {analysisResult.viralMoments.map((moment: Clip, index: number) => (
+                          <div key={index} className="bg-gray-800 p-5 rounded-xl border border-gray-700">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <div className="flex items-center mb-3">
+                                  <div className={`font-bold text-2xl p-3 rounded-lg ${moment.viralScore > 90 ? 'bg-green-500/20 text-green-400' : moment.viralScore > 80 ? 'bg-yellow-500/20 text-yellow-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                                    {moment.viralScore}
+                                  </div>
+                                  <div className="ml-4">
+                                    <h4 className="text-xl font-semibold">{moment.suggestedTitle}</h4>
+                                    <p className="text-gray-400 text-sm flex items-center mt-1">
+                                      <Clock size={14} className="mr-2" /> {moment.startTime} - {moment.endTime}
+                                      <span className="mx-2">|</span>
+                                      <ThumbsUp size={14} className="mr-2" /> Category: {moment.category}
+                                    </p>
+                                  </div>
+                                </div>
+                                <p className="text-gray-300 my-3 ml-1"><strong>Hook:</strong> "{moment.hook}"</p>
+                                <p className="text-gray-400 ml-1"><strong>Reason:</strong> {moment.reason}</p>
                               </div>
-                              <div className="ml-4">
-                                <h4 className="text-xl font-semibold">{moment.suggestedTitle}</h4>
-                                <p className="text-gray-400 text-sm flex items-center mt-1">
-                                  <Clock size={14} className="mr-2" /> {moment.startTime} - {moment.endTime}
-                                  <span className="mx-2">|</span>
-                                  <ThumbsUp size={14} className="mr-2" /> Category: {moment.category}
-                                </p>
-                              </div>
+                              <button
+                              onClick={() => handleAddClip(moment)}
+                              disabled={extractingClip}
+                              className="bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:cursor-not-allowed text-white font-semibold py-2 px-4 rounded-lg transition-all"
+                            >
+                              {extractingClip ? (
+                                <div className="flex items-center">
+                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                  Extracting...
+                                </div>
+                              ) : (
+                                'Extract Viral Clip'
+                              )}
+                            </button>
                             </div>
-                            <p className="text-gray-300 my-3 ml-1"><strong>Hook:</strong> "{moment.hook}"</p>
-                            <p className="text-gray-400 ml-1"><strong>Reason:</strong> {moment.reason}</p>
                           </div>
-                          <button
-                          onClick={() => handleAddClip(moment)}
-                          disabled={extractingClip}
-                          className="bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:cursor-not-allowed text-white font-semibold py-2 px-4 rounded-lg transition-all"
-                        >
-                          {extractingClip ? (
-                            <div className="flex items-center">
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                              Extracting...
-                            </div>
-                          ) : (
-                            'Extract Viral Clip'
-                          )}
-                        </button>
-                        </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    </>
+                  )}
+                  {analysisResult.viralMoments && analysisResult.viralMoments.length === 0 && (
+                    <div className="bg-gray-800 p-6 rounded-xl border border-gray-700 text-center text-gray-400">
+                      <p className="text-lg">No viral moments found for this video.</p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
