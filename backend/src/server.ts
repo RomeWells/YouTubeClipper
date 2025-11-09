@@ -26,7 +26,7 @@ const app = express();
 
 console.log('🔧 Configuring middleware...');
 app.use(cors({
-  origin: 'http://localhost:5173',
+  origin: ['http://localhost:5173', 'http://localhost:5174'],
   credentials: true
 }));
 app.use(express.json());
@@ -43,6 +43,11 @@ console.log('🛣️ Registering routes...');
 app.use('/api/gemini', geminiRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/youtube', youtubeRoutes); // Register new YouTube routes
+
+// Temporary test route
+app.get('/api/test-route', (req, res) => {
+  res.send('Test route is working!');
+});
 
 app.get('/', (req, res) => {
   res.send('YouTube Viral Clipper API is running!');
