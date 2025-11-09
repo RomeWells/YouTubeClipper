@@ -37,7 +37,7 @@ export class WhisperService {
 
       console.log(`Starting Whisper transcription for: ${audioFilePath}`);
       // Execute the Python script for transcription
-      const command = `python3 ../whisper_transcribe.py --file_path "${audioFilePath}"`;
+      const command = `../venv/bin/python3 ../whisper_transcribe.py --file_path "${audioFilePath}"`;
       const { stdout, stderr } = await execAsync(command, {
         cwd: process.cwd(),
       });
