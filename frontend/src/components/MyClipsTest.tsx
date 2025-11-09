@@ -2,16 +2,21 @@
 import React, { useState, useEffect } from 'react';
 import { UploadCloud, Clock } from 'lucide-react';
 import VideoPlayer from './VideoPlayer';
+import ScheduleModal from './ScheduleModal'; // Import ScheduleModal
 
 interface Clip {
-  id: number;
-  timestamp: string;
+  id?: number; // Made optional as it's not always present in the main Clip interface
+  timestamp?: string; // Made optional
   startTime: string;
   endTime: string;
   suggestedTitle: string;
   hook: string;
   reason: string;
+  viralScore?: number; // Made optional
+  category?: string; // Made optional
   clipPath?: string; // Optional, for testing purposes
+  suggestedDescription?: string; // Add suggestedDescription
+  tags?: string[]; // Add tags
 }
 
 const mockAnalysisResults: Clip[] = [
@@ -24,6 +29,8 @@ const mockAnalysisResults: Clip[] = [
     hook: "Watch this cat defy gravity!",
     reason: "Cats are popular, and backflips are unexpected.",
     clipPath: "/videos/extracted/mock_cat_clip.mp4", // Mock path
+    suggestedDescription: "This cat is amazing! #cat #backflip #viral",
+    tags: ["cat", "backflip", "funny", "viral"],
   },
   {
     id: 2,
@@ -34,6 +41,8 @@ const mockAnalysisResults: Clip[] = [
     hook: "You won't believe what this dog says!",
     reason: "Talking animals are always a hit.",
     clipPath: "/videos/extracted/mock_dog_clip.mp4", // Mock path
+    suggestedDescription: "A dog that can talk? Unbelievable! #dog #talkingdog #funny",
+    tags: ["dog", "talking", "funny", "viral"],
   },
   {
     id: 3,
@@ -44,12 +53,19 @@ const mockAnalysisResults: Clip[] = [
     hook: "Sour face, sweet laughs!",
     reason: "Babies' reactions are universally funny.",
     clipPath: "/videos/extracted/mock_baby_clip.mp4", // Mock path
+    suggestedDescription: "Baby tries lemon for the first time! #baby #lemon #funny",
+    tags: ["baby", "lemon", "funny", "viral"],
   },
 ];
 
 const MyClipsTest: React.FC = () => {
   const [selectedClips, setSelectedClips] = useState<Clip[]>([]);
   const [showToast, setShowToast] = useState(false);
+  const [uploading, setUploading] = useState(false); // New state
+  const [uploadError, setUploadError] = useState<string | null>(null); // New state
+  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null); // New state
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false); // New state
+  const [clipToSchedule, setClipToSchedule] = useState<Clip | null>(null); // New state
 
   useEffect(() => {
     if (showToast) {
@@ -68,6 +84,117 @@ const MyClipsTest: React.FC = () => {
 
   const handleRemoveClip = (indexToRemove: number) => {
     setSelectedClips((prevClips) => prevClips.filter((_, index) => index !== indexToRemove));
+  };
+
+  // New functions for posting and scheduling
+  const handlePostNow = async (clip: Clip) => {
+    setUploading(true);
+    setUploadError(null);
+    setUploadSuccess(null);
+
+    if (!clip.clipPath) {
+      setUploadError('Clip path is missing. Cannot upload.');
+      setUploading(false);
+      return;
+    }
+
+    try {
+      const response = await fetch('http://localhost:3001/api/youtube/upload', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          clipPath: clip.clipPath,
+          title: clip.suggestedTitle,
+          description: clip.suggestedDescription || '',
+          tags: clip.tags || [],
+          privacyStatus: 'public',
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to upload video.');
+      }
+
+      const data = await response.json();
+      setUploadSuccess(`Video uploaded! YouTube ID: ${data.videoId}`);
+      // Optionally remove the clip from selectedClips after successful upload
+      // onRemoveClip(selectedClips.indexOf(clip));
+    } catch (error: any) {
+      setUploadError(error.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleSchedulePost = (clip: Clip) => {
+    setClipToSchedule(clip);
+    setIsScheduleModalOpen(true);
+  };
+
+  const handleScheduleConfirm = async (publishAt: Date) => {
+    if (!clipToSchedule || !clipToSchedule.clipPath) {
+      setUploadError('Clip data missing for scheduling.');
+      return;
+    }
+
+    setUploading(true);
+    setUploadError(null);
+    setUploadSuccess(null);
+    setIsScheduleModalOpen(false);
+
+    try {
+      // First, upload as private
+      const uploadResponse = await fetch('http://localhost:3001/api/youtube/upload', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          clipPath: clipToSchedule.clipPath,
+          title: clipToSchedule.suggestedTitle,
+          description: clipToSchedule.suggestedDescription || '',
+          tags: clipToSchedule.tags || [],
+          privacyStatus: 'private',
+        }),
+      });
+
+      if (!uploadResponse.ok) {
+        const errorData = await uploadResponse.json();
+        throw new Error(errorData.error || 'Failed to upload video for scheduling.');
+      }
+
+      const uploadData = await uploadResponse.json();
+      const videoId = uploadData.videoId;
+
+      // Then, schedule the publish time
+      const scheduleResponse = await fetch('http://localhost:3001/api/youtube/schedule', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          videoId,
+          publishAt: publishAt.toISOString(),
+        }),
+      });
+
+      if (!scheduleResponse.ok) {
+        const errorData = await scheduleResponse.json();
+        throw new Error(errorData.error || 'Failed to schedule video.');
+      }
+
+      setUploadSuccess(`Video uploaded privately and scheduled for ${publishAt.toLocaleString()}. YouTube ID: ${videoId}`);
+      // Optionally remove the clip from selectedClips after successful scheduling
+      // onRemoveClip(selectedClips.indexOf(clipToSchedule));
+    } catch (error: any) {
+      setUploadError(error.message);
+    } finally {
+      setUploading(false);
+      setClipToSchedule(null);
+    }
   };
 
   return (
@@ -104,6 +231,10 @@ const MyClipsTest: React.FC = () => {
           <p className="text-gray-400">Review and manage your selected clips before posting.</p>
         </header>
 
+        {uploading && <div className="bg-blue-600 p-3 rounded-lg text-white text-center mb-4">Processing video...</div>}
+        {uploadError && <div className="bg-red-600 p-3 rounded-lg text-white text-center mb-4">Error: {uploadError}</div>}
+        {uploadSuccess && <div className="bg-green-600 p-3 rounded-lg text-white text-center mb-4">Success: {uploadSuccess}</div>}
+
         {selectedClips.length === 0 ? (
           <div className="bg-gray-800 p-6 rounded-xl border border-gray-700 text-center text-gray-400 shadow-inner">
             <p className="text-lg">No clips selected yet. Select from the "Available Viral Moments" above!</p>
@@ -138,18 +269,20 @@ const MyClipsTest: React.FC = () => {
 
       <div className="mt-10 flex justify-end space-x-4">
         <button
+          onClick={() => handleSchedulePost(selectedClips[0])} // Assuming only one clip for testing
+          disabled={selectedClips.length === 0 || uploading}
           className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-900 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-lg transition-all flex items-center shadow-lg"
-          disabled={selectedClips.length === 0}
         >
           <Clock size={18} className="mr-2" />
           Schedule Post
         </button>
         <button
+          onClick={() => handlePostNow(selectedClips[0])} // Assuming only one clip for testing
+          disabled={selectedClips.length === 0 || uploading}
           className="bg-purple-600 hover:bg-purple-700 disabled:bg-purple-900 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-lg transition-all flex items-center shadow-lg"
-          disabled={selectedClips.length === 0}
         >
           <UploadCloud size={18} className="mr-2" />
-          Post Now
+          {uploading ? 'Uploading...' : 'Post Now'}
         </button>
       </div>
     </section>
@@ -159,6 +292,14 @@ const MyClipsTest: React.FC = () => {
           Clip added to My Clips!
         </div>
       )}
+
+      <ScheduleModal
+        isOpen={isScheduleModalOpen}
+        onClose={() => setIsScheduleModalOpen(false)}
+        onSchedule={handleScheduleConfirm}
+        loading={uploading}
+        error={uploadError}
+      />
     </div>
   );
 };
