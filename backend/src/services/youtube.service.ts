@@ -42,8 +42,6 @@ export const getVideoDetails = async (videoId: string) => {
   }
 };
 
-import { fetchTranscript } from 'youtube-transcript-plus';
-
 /**
  * Fetches the transcript for a YouTube video using the youtube-transcript-plus library.
  * @param videoId The ID of the YouTube video.
